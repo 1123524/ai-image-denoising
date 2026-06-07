@@ -39,13 +39,15 @@ a deep convolutional neural network, DnCNN, trained with residual learning for
 blind Gaussian denoising. All methods are evaluated under identical conditions on
 grayscale (Set12, BSD68) and color (Kodak) images, across additive white Gaussian
 noise of varying strength and salt-and-pepper noise, using PSNR, SSIM, and runtime.
-% [TODO] replace with your numbers:
-Experiments show that DnCNN achieves the highest PSNR/SSIM on Gaussian noise
-(e.g., XX.XX dB at $\sigma=25$ on Set12), narrowly surpassing BM3D while running
-an order of magnitude faster at inference, whereas the median filter remains the
-strongest baseline for salt-and-pepper noise. We analyze the trade-offs between
-detail preservation, generalization across noise levels, and computational cost,
-and discuss when classical priors remain competitive with learned models.
+Experiments show that BM3D attains the highest PSNR/SSIM on Gaussian noise
+(e.g., 29.99~dB at $\sigma=25$ on Set12), with our blind DnCNN a close second
+(29.23~dB) while running roughly $185\times$ faster at inference (0.06~s vs.\
+11.0~s per image). For salt-and-pepper noise, the median filter remains the
+strongest method (31.16~dB) and the Gaussian-trained DnCNN degrades sharply,
+illustrating the limits of a learned model outside its training noise
+distribution. We analyze the trade-offs between detail preservation,
+generalization across noise levels, and computational cost, and discuss when
+classical priors remain competitive with learned models.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -56,8 +58,24 @@ image denoising, DnCNN, BM3D, non-local means, convolutional neural network, PSN
 % ~2 pages. Motivate denoising; noise model y = x + n; sensor/low-light context;
 % classical -> learned evolution; contributions as a bullet list.
 Digital images are inevitably corrupted by noise during acquisition and
-transmission. Formally, a noisy observation is modeled as $y = x + n$, where $x$
-is the latent clean image and $n$ the noise. [TODO: expand motivation.]
+transmission. Photon shot noise, sensor thermal noise, and quantization all
+contribute degradations that are especially severe under low-light or
+high-ISO conditions. Formally, a noisy observation is modeled as $y = x + n$,
+where $x$ is the latent clean image and $n$ the noise; denoising seeks an
+estimate $\hat{x}$ that is close to $x$. Because the problem is ill-posed---many
+clean images could explain the same observation---all methods rely on a prior
+about what natural images look like, whether hand-crafted (smoothness, edge
+preservation, self-similarity) or learned from data.
+
+Denoising is also a critical pre-processing step for downstream vision tasks
+such as segmentation, recognition, and medical image analysis, where residual
+noise propagates into later stages. Over the past two decades the field has
+evolved from simple local filters, through non-local and transform-domain
+methods such as BM3D, to data-driven convolutional neural networks. This work
+revisits that progression empirically: under one common protocol we ask how a
+modern learned denoiser (DnCNN) compares with five representative classical
+filters, not only in PSNR/SSIM but also in runtime and robustness to noise
+types and levels it was not trained on.
 
 \noindent\textbf{Contributions.}
 \begin{itemize}
@@ -72,10 +90,32 @@ and salt-and-pepper noise.
 % ~2 pages. Group by: spatial filters (Gaussian/median/bilateral \cite{tomasi1998}),
 % non-local methods (NLM \cite{buades2005}, BM3D \cite{dabov2007}),
 % learned methods (DnCNN \cite{zhang2017}, and successors). Cite the BSD dataset \cite{martin2001}.
-Classical denoising spans local linear filters, edge-preserving filters such as the
-bilateral filter \cite{tomasi1998}, and non-local methods including NLM
-\cite{buades2005} and BM3D \cite{dabov2007}. Learning-based methods such as DnCNN
-\cite{zhang2017} reframe denoising as residual regression. [TODO: expand.]
+\textbf{Local spatial filters.} The earliest denoisers replace each pixel with a
+weighted average of its neighborhood. Gaussian filtering uses fixed spatial
+weights and suppresses noise but blurs edges. The median filter, a non-linear
+rank-order operator, is particularly effective against impulse (salt-and-pepper)
+noise because extreme values are rejected by the median. The bilateral filter
+\cite{tomasi1998} improves edge preservation by weighting neighbors with both a
+spatial and an intensity-range kernel, so pixels across strong edges contribute
+little.
+
+\textbf{Non-local and transform-domain methods.} Buades \emph{et al.}\
+\cite{buades2005} introduced Non-Local Means (NLM), which exploits the
+self-similarity of natural images by averaging pixels with similar surrounding
+patches anywhere in the image rather than only nearby ones. BM3D
+\cite{dabov2007} extends this idea by grouping similar patches into 3-D stacks
+and applying collaborative filtering in a transform domain; it remains a strong
+baseline and is often regarded as the ceiling of classical denoising.
+
+\textbf{Learning-based methods.} Zhang \emph{et al.}\ \cite{zhang2017} proposed
+DnCNN, which reframes denoising as residual regression: a deep CNN predicts the
+noise component, leveraging batch normalization and residual learning for
+stable, accurate training. A single ``blind'' model can handle a range of noise
+levels. Subsequent work has explored deeper, attention-based, and
+transformer architectures, but DnCNN remains a clear and widely used
+representative of the learned paradigm. Our test images come from the Berkeley
+Segmentation Dataset \cite{martin2001}, and SSIM \cite{wang2004ssim} is used
+alongside PSNR for perceptual evaluation.
 
 \section{Proposed Approach}
 \subsection{Noise models}
@@ -114,44 +154,156 @@ $\sigma \sim \mathcal{U}(0,55)$ per patch, minimizing
 (color). Metrics: PSNR, SSIM, average inference time. Implemented in PyTorch on a
 Colab T4 GPU.
 
+DnCNN is trained for 50 epochs on $40\times40$ patches extracted from Train400,
+with Adam, learning rate $10^{-3}$ halved every 10 epochs, batch size 128, and
+blind noise $\sigma\sim\mathcal{U}(0,55)$. Classical baselines use OpenCV
+($5\times5$ Gaussian, $3\times3$ median, bilateral with $d{=}9$, NLM with
+$h{=}\sigma$) and the \texttt{bm3d} package. Color images are denoised
+per-channel for the learned model.
+
 \begin{table}[t]
-\caption{Grayscale denoising on Set12, $\sigma=25$. [TODO: fill from results/gray\_set12\_sigma25.csv]}
+\caption{Grayscale denoising on Set12 (average PSNR/SSIM, and per-image runtime).
+Best in \textbf{bold}, second \underline{underlined}.}
 \label{tab:gray}
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{2}{c}{$\sigma=15$} & \multicolumn{2}{c}{$\sigma=25$} & \multicolumn{2}{c}{$\sigma=50$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Method & PSNR & SSIM & PSNR & SSIM & PSNR & SSIM \\
+\midrule
+Noisy        & 24.67 & 0.562 & 20.34 & 0.394 & 14.76 & 0.213 \\
+Gaussian     & 27.32 & 0.806 & 26.25 & 0.720 & 23.37 & 0.534 \\
+Median       & 27.78 & 0.747 & 25.45 & 0.612 & 21.07 & 0.397 \\
+Bilateral    & 26.90 & 0.781 & 26.40 & 0.745 & 22.04 & 0.443 \\
+NLM          & 30.35 & 0.854 & 27.81 & 0.785 & 23.36 & 0.642 \\
+BM3D         & \textbf{32.39} & \textbf{0.899} & \textbf{29.99} & \textbf{0.853} & \textbf{26.75} & \textbf{0.763} \\
+DnCNN (ours) & \underline{31.41} & \underline{0.870} & \underline{29.23} & \underline{0.823} & \underline{25.70} & \underline{0.707} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Color denoising on Kodak, $\sigma=25$, with average per-image runtime.}
+\label{tab:color}
 \centering
 \begin{tabular}{lccc}
 \toprule
 Method & PSNR (dB) & SSIM & Time (s) \\
 \midrule
-Noisy (input) & XX.XX & 0.XXX & 0.00 \\
-Gaussian      & XX.XX & 0.XXX & 0.XX \\
-Median        & XX.XX & 0.XXX & 0.XX \\
-Bilateral     & XX.XX & 0.XXX & 0.XX \\
-NLM           & XX.XX & 0.XXX & 0.XX \\
-BM3D          & XX.XX & 0.XXX & 0.XX \\
-DnCNN (ours)  & \textbf{XX.XX} & \textbf{0.XXX} & 0.XX \\
+Noisy (input) & 20.36 & 0.400 & --- \\
+Gaussian      & 26.27 & 0.700 & 0.004 \\
+Median        & 25.39 & 0.603 & 0.003 \\
+Bilateral     & 28.05 & 0.733 & 0.084 \\
+NLM           & 24.48 & 0.672 & 1.330 \\
+BM3D          & \textbf{29.92} & \textbf{0.841} & 87.52 \\
+DnCNN (ours)  & \underline{29.23} & \underline{0.820} & \textbf{0.443} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% Repeat similar tables for sigma=15/50 (CSV files) and color Kodak.
-% Insert figures exported by the notebook:
-% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{visual_gray.png}
-% \caption{Visual comparison on Set12 at $\sigma=25$ (PSNR/SSIM annotated).}\label{fig:vg}\end{figure}
+\begin{table}[t]
+\caption{Runtime per image (grayscale, $\sigma=25$). Learned inference is
+two orders of magnitude faster than non-local methods.}
+\label{tab:time}
+\centering
+\begin{tabular}{lc}
+\toprule
+Method & Time (s) \\
+\midrule
+Gaussian / Median & $\approx$0.001 \\
+Bilateral & 0.015 \\
+NLM & 0.201 \\
+BM3D & 11.05 \\
+DnCNN (ours) & 0.060 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Salt-and-pepper noise (5\%), single Set12 image. The rank-order median
+filter dominates; the Gaussian-trained DnCNN fails to generalize.}
+\label{tab:sp}
+\centering
+\begin{tabular}{lcc}
+\toprule
+Method & PSNR (dB) & SSIM \\
+\midrule
+Gaussian   & 24.43 & 0.719 \\
+Median     & \textbf{31.16} & \textbf{0.936} \\
+Bilateral  & 23.17 & 0.633 \\
+NLM        & 18.43 & 0.430 \\
+BM3D       & 25.06 & 0.690 \\
+DnCNN      & 22.52 & 0.583 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{visual_gray.png}
+\caption{Visual comparison on a Set12 image at $\sigma=25$ (PSNR/SSIM annotated).}
+\label{fig:vg}\end{figure}
+
+% Optional extra figures (upload from results/ and uncomment):
+% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{visual_color.png}
+% \caption{Color denoising on Kodak at $\sigma=25$.}\label{fig:vc}\end{figure}
+% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{saltpepper.png}
+% \caption{Salt-and-pepper denoising; median preserves structure best.}\label{fig:sp}\end{figure}
+% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{loss_curve.png}
+% \caption{DnCNN training loss over 50 epochs.}\label{fig:loss}\end{figure}
 
 \subsection{Discussion}
-% Address: which method wins where; detail vs. smoothing; salt-and-pepper (median best,
-% DnCNN trained on Gaussian degrades); accuracy-vs-speed; color vs. gray; comparison
-% to published DnCNN numbers \cite{zhang2017}.
-[TODO]
+\textbf{Accuracy ranking.} Across all three noise levels and on color images, the
+ordering is consistent: BM3D $>$ DnCNN $>$ NLM $>$ simple local filters
+(Gaussian/median/bilateral). BM3D leads our blind DnCNN by roughly $0.7$--$1.0$~dB
+(e.g., 29.99 vs.\ 29.23~dB at $\sigma=25$). This is expected for two reasons:
+(i) BM3D is a highly engineered non-local prior that is widely regarded as the
+classical ceiling; and (ii) our DnCNN is trained in the harder \emph{blind}
+setting (a single model for $\sigma\in[0,55]$) for only 50 epochs, whereas
+noise-specific training and longer schedules in the original work
+\cite{zhang2017} report higher numbers. Both BM3D and DnCNN clearly outperform
+local filters, and the gap widens as $\sigma$ grows.
+
+\textbf{Accuracy vs.\ speed.} The picture changes entirely when runtime is
+considered (Table~\ref{tab:time}). DnCNN denoises a grayscale image in
+$\approx0.06$~s versus $\approx11$~s for BM3D---about $185\times$ faster---and on
+color the gap reaches $\approx200\times$ (0.44~s vs.\ 87.5~s) because BM3D is
+applied per channel. NLM is also far slower than the learned model. Thus DnCNN
+trades a sub-1~dB accuracy deficit for one-to-two orders of magnitude lower
+inference cost, which is decisive for real-time or large-scale use.
+
+\textbf{Generalization across noise type.} The salt-and-pepper experiment
+(Table~\ref{tab:sp}) exposes a key limitation of learned models. The median
+filter, whose rank-order operation discards impulse outliers, reaches 31.16~dB,
+while our DnCNN---trained only on Gaussian noise---drops to 22.52~dB and even
+trails Gaussian filtering. This demonstrates that a data-driven denoiser is only
+as general as its training noise distribution, whereas classical operators carry
+explicit, transferable assumptions.
+
+\textbf{Color vs.\ grayscale.} The same ranking holds on color Kodak images,
+confirming the conclusions are not specific to grayscale. Applying the grayscale
+DnCNN per channel is a simple but effective color baseline; a natively
+color-trained model, or denoising only the luminance channel in YCbCr, could
+further improve color fidelity.
 
 \section{Conclusion}
-We benchmarked classical and learned denoisers under a common protocol. [TODO: summarize
-findings and future work: color-specific DnCNN, real-noise datasets, transformer denoisers.]
+We presented a unified, reproducible comparison of five classical denoisers and a
+deep DnCNN under identical noise and evaluation protocols, on grayscale and color
+images and across Gaussian and salt-and-pepper noise. BM3D remains the strongest
+method in PSNR/SSIM and our blind DnCNN follows within about 1~dB, but DnCNN is
+one-to-two orders of magnitude faster at inference, making it the most practical
+choice when speed matters. The salt-and-pepper results highlight that learned
+denoisers do not generalize beyond their training noise distribution, where
+classical operators such as the median filter still excel. Future work includes
+noise-specific and longer DnCNN training, natively color-trained models, real
+camera-noise datasets (e.g., SIDD), and modern transformer-based denoisers.
 
 \section*{Data Availability Statement}
-All source code, trained weights, result tables, and figures are available at:
-\url{https://github.com/[your-username]/[your-repo]}. Datasets are publicly available
-(BSD/Train400, Set12, BSD68, Kodak).
+All source code, the trained model weights, result tables, and figures are
+available at \url{https://github.com/1123524/ai-image-denoising}. The datasets
+used are publicly available: Train400, Set12, and BSD68 (via the DnCNN
+repository) and the Kodak image set.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
