@@ -1,0 +1,159 @@
+%% =====================================================================
+%% IEEE Conference style final report
+%% HOW TO USE (Overleaf):
+%%   1. Open https://www.overleaf.com/latex/templates/ieee-conference-template/grfzhhncsfqn
+%%   2. "Open as Template" -> replace its main.tex with THIS file
+%%   3. Upload references.bib and your figures from results/ into the project
+%%   4. Recompile. Target length: 10-12 pages excluding references.
+%% Fill every [TODO] and replace placeholder numbers with your real results.
+%% =====================================================================
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{url}
+
+\begin{document}
+
+\title{A Comparative Study of Classical Filters and Deep Learning for Image Denoising}
+
+\author{\IEEEauthorblockN{[Your Name]}
+\IEEEauthorblockA{Department of [Department]\\
+Yuan Ze University\\
+Email: [you@example.com]}}
+
+\maketitle
+
+\begin{abstract}
+% 150-250 words. Problem, what you did, key result, conclusion.
+Image denoising aims to recover a clean image from a noisy observation and is a
+fundamental low-level vision task. This work presents a systematic comparison
+between five classical denoising techniques---Gaussian, median, and bilateral
+filtering, Non-Local Means (NLM), and Block-Matching and 3D filtering (BM3D)---and
+a deep convolutional neural network, DnCNN, trained with residual learning for
+blind Gaussian denoising. All methods are evaluated under identical conditions on
+grayscale (Set12, BSD68) and color (Kodak) images, across additive white Gaussian
+noise of varying strength and salt-and-pepper noise, using PSNR, SSIM, and runtime.
+% [TODO] replace with your numbers:
+Experiments show that DnCNN achieves the highest PSNR/SSIM on Gaussian noise
+(e.g., XX.XX dB at $\sigma=25$ on Set12), narrowly surpassing BM3D while running
+an order of magnitude faster at inference, whereas the median filter remains the
+strongest baseline for salt-and-pepper noise. We analyze the trade-offs between
+detail preservation, generalization across noise levels, and computational cost,
+and discuss when classical priors remain competitive with learned models.
+\end{abstract}
+
+\begin{IEEEkeywords}
+image denoising, DnCNN, BM3D, non-local means, convolutional neural network, PSNR, SSIM
+\end{IEEEkeywords}
+
+\section{Introduction}
+% ~2 pages. Motivate denoising; noise model y = x + n; sensor/low-light context;
+% classical -> learned evolution; contributions as a bullet list.
+Digital images are inevitably corrupted by noise during acquisition and
+transmission. Formally, a noisy observation is modeled as $y = x + n$, where $x$
+is the latent clean image and $n$ the noise. [TODO: expand motivation.]
+
+\noindent\textbf{Contributions.}
+\begin{itemize}
+\item A unified, reproducible benchmark comparing five classical filters with DnCNN
+under identical noise and evaluation protocols.
+\item Evaluation across grayscale and color images, multiple Gaussian noise levels,
+and salt-and-pepper noise.
+\item An analysis of accuracy vs.\ runtime trade-offs and the limits of generalization.
+\end{itemize}
+
+\section{Related Work}
+% ~2 pages. Group by: spatial filters (Gaussian/median/bilateral \cite{tomasi1998}),
+% non-local methods (NLM \cite{buades2005}, BM3D \cite{dabov2007}),
+% learned methods (DnCNN \cite{zhang2017}, and successors). Cite the BSD dataset \cite{martin2001}.
+Classical denoising spans local linear filters, edge-preserving filters such as the
+bilateral filter \cite{tomasi1998}, and non-local methods including NLM
+\cite{buades2005} and BM3D \cite{dabov2007}. Learning-based methods such as DnCNN
+\cite{zhang2017} reframe denoising as residual regression. [TODO: expand.]
+
+\section{Proposed Approach}
+\subsection{Noise models}
+We synthesize additive white Gaussian noise $n \sim \mathcal{N}(0,\sigma^2)$ for
+$\sigma \in \{15,25,50\}$ and salt-and-pepper noise at 5\% density.
+
+\subsection{Classical baselines}
+We evaluate Gaussian, median, and bilateral filtering, NLM, and BM3D with the
+parameter settings reported in Section~\ref{sec:exp}.
+
+\subsection{DnCNN with residual learning}
+DnCNN predicts the noise residual $\mathcal{R}(y)\approx n$ and recovers
+$\hat{x} = y - \mathcal{R}(y)$. The network stacks Conv--BN--ReLU blocks
+(17 layers, 64 feature maps). We train for \emph{blind} denoising by sampling
+$\sigma \sim \mathcal{U}(0,55)$ per patch, minimizing
+\begin{equation}
+\mathcal{L}(\theta) = \frac{1}{2N}\sum_{i=1}^{N}\lVert \mathcal{R}_\theta(y_i) - (y_i - x_i)\rVert_F^2 .
+\end{equation}
+
+\begin{algorithmic}[1]
+\STATE Extract $40\times40$ patches from Train400 (flip/rotate augmentation)
+\FOR{each epoch}
+  \FOR{each minibatch $\{x_i\}$}
+    \STATE sample $\sigma$, form $y_i = x_i + n_i$
+    \STATE $\hat{n}_i \leftarrow \mathcal{R}_\theta(y_i)$;\; update $\theta$ on $\lVert \hat{n}_i-n_i\rVert^2$
+  \ENDFOR
+\ENDFOR
+\end{algorithmic}
+
+% [TODO] add an architecture diagram exported from your slides:
+% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{architecture.png}
+% \caption{DnCNN architecture.}\label{fig:arch}\end{figure}
+
+\section{Experimental Analysis}\label{sec:exp}
+\textbf{Setup.} Training on Train400; testing on Set12/BSD68 (gray) and Kodak
+(color). Metrics: PSNR, SSIM, average inference time. Implemented in PyTorch on a
+Colab T4 GPU.
+
+\begin{table}[t]
+\caption{Grayscale denoising on Set12, $\sigma=25$. [TODO: fill from results/gray\_set12\_sigma25.csv]}
+\label{tab:gray}
+\centering
+\begin{tabular}{lccc}
+\toprule
+Method & PSNR (dB) & SSIM & Time (s) \\
+\midrule
+Noisy (input) & XX.XX & 0.XXX & 0.00 \\
+Gaussian      & XX.XX & 0.XXX & 0.XX \\
+Median        & XX.XX & 0.XXX & 0.XX \\
+Bilateral     & XX.XX & 0.XXX & 0.XX \\
+NLM           & XX.XX & 0.XXX & 0.XX \\
+BM3D          & XX.XX & 0.XXX & 0.XX \\
+DnCNN (ours)  & \textbf{XX.XX} & \textbf{0.XXX} & 0.XX \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% Repeat similar tables for sigma=15/50 (CSV files) and color Kodak.
+% Insert figures exported by the notebook:
+% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{visual_gray.png}
+% \caption{Visual comparison on Set12 at $\sigma=25$ (PSNR/SSIM annotated).}\label{fig:vg}\end{figure}
+
+\subsection{Discussion}
+% Address: which method wins where; detail vs. smoothing; salt-and-pepper (median best,
+% DnCNN trained on Gaussian degrades); accuracy-vs-speed; color vs. gray; comparison
+% to published DnCNN numbers \cite{zhang2017}.
+[TODO]
+
+\section{Conclusion}
+We benchmarked classical and learned denoisers under a common protocol. [TODO: summarize
+findings and future work: color-specific DnCNN, real-noise datasets, transformer denoisers.]
+
+\section*{Data Availability Statement}
+All source code, trained weights, result tables, and figures are available at:
+\url{https://github.com/[your-username]/[your-repo]}. Datasets are publicly available
+(BSD/Train400, Set12, BSD68, Kodak).
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

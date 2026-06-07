@@ -1,0 +1,21 @@
+# 自動下載的資料集（可重新下載，不進 repo）
+DnCNN/
+color_test/
+results.zip
+# 註：results/ 內的 CSV、圖片、模型權重(.pth) 要進 repo（給教授看結果），故不忽略
+
+# Colab / Python
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+
+# LaTeX 編譯產物
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+
+# 系統
+.DS_Store
