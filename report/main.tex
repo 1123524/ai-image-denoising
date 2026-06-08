@@ -86,7 +86,14 @@ and salt-and-pepper noise.
 \item An analysis of accuracy vs.\ runtime trade-offs and the limits of generalization.
 \end{itemize}
 
-\section{Related Work}
+The remainder of this paper is organized as follows. Section~\ref{sec:rw}
+reviews classical and learned denoising. Section~\ref{sec:method} formalizes the
+noise models, the classical baselines, the DnCNN architecture and training
+objective, and the evaluation metrics. Section~\ref{sec:exp} presents
+quantitative and qualitative results and a detailed discussion, and
+Section~\ref{sec:conc} concludes.
+
+\section{Related Work}\label{sec:rw}
 % ~2 pages. Group by: spatial filters (Gaussian/median/bilateral \cite{tomasi1998}),
 % non-local methods (NLM \cite{buades2005}, BM3D \cite{dabov2007}),
 % learned methods (DnCNN \cite{zhang2017}, and successors). Cite the BSD dataset \cite{martin2001}.
@@ -117,14 +124,64 @@ representative of the learned paradigm. Our test images come from the Berkeley
 Segmentation Dataset \cite{martin2001}, and SSIM \cite{wang2004ssim} is used
 alongside PSNR for perceptual evaluation.
 
-\section{Proposed Approach}
+\section{Proposed Approach}\label{sec:method}
 \subsection{Noise models}
 We synthesize additive white Gaussian noise $n \sim \mathcal{N}(0,\sigma^2)$ for
 $\sigma \in \{15,25,50\}$ and salt-and-pepper noise at 5\% density.
 
 \subsection{Classical baselines}
-We evaluate Gaussian, median, and bilateral filtering, NLM, and BM3D with the
-parameter settings reported in Section~\ref{sec:exp}.
+We evaluate five representative classical methods, ordered by increasing
+modeling power.
+
+\textbf{Gaussian filter.} A linear convolution with a Gaussian kernel,
+\begin{equation}
+\hat{x}(p) = \sum_{q\in\mathcal{N}(p)} G_{\sigma_s}(\lVert p-q\rVert)\, y(q),
+\qquad G_{\sigma_s}(d)=\tfrac{1}{Z}e^{-d^2/2\sigma_s^2},
+\end{equation}
+where $\mathcal{N}(p)$ is a local window and $Z$ a normalizing constant. It
+attenuates high-frequency noise but blurs edges indiscriminately.
+
+\textbf{Median filter.} A non-linear, rank-order operator that replaces each
+pixel by the median of its neighborhood,
+$\hat{x}(p)=\operatorname{median}\{y(q): q\in\mathcal{N}(p)\}$. Because the median
+ignores extreme values, it is highly effective against impulse (salt-and-pepper)
+noise.
+
+\textbf{Bilateral filter.} An edge-preserving extension of Gaussian filtering
+that weights neighbors by both spatial and intensity proximity,
+\begin{equation}
+\hat{x}(p)=\frac{1}{Z_p}\sum_{q\in\mathcal{N}(p)}
+G_{\sigma_s}(\lVert p-q\rVert)\,G_{\sigma_r}(|y(p)-y(q)|)\,y(q),
+\end{equation}
+so that pixels across strong edges (large intensity difference) contribute
+little, preserving structure.
+
+\textbf{Non-Local Means (NLM).} Exploits image self-similarity by averaging over
+all pixels weighted by patch similarity \cite{buades2005},
+\begin{equation}
+\hat{x}(p)=\sum_{q} w(p,q)\,y(q),\quad
+w(p,q)\propto e^{-\lVert P(p)-P(q)\rVert_2^2 / h^2},
+\end{equation}
+where $P(\cdot)$ denotes a patch around a pixel and $h$ controls filtering
+strength; we set $h=\sigma$.
+
+\textbf{BM3D.} Groups similar patches into 3-D stacks and applies collaborative
+filtering (hard-thresholding then Wiener filtering) in a sparsifying transform
+domain \cite{dabov2007}. It is widely regarded as the strongest classical
+denoiser and serves as our upper-bound baseline.
+
+\subsection{Evaluation metrics}
+We report Peak Signal-to-Noise Ratio (PSNR) and Structural Similarity (SSIM)
+\cite{wang2004ssim}. For images in $[0,255]$,
+\begin{equation}
+\mathrm{PSNR}(x,\hat{x}) = 10\log_{10}\frac{255^2}{\frac{1}{N}\sum_i (x_i-\hat{x}_i)^2},
+\end{equation}
+\begin{equation}
+\mathrm{SSIM}(x,\hat{x}) = \frac{(2\mu_x\mu_{\hat{x}}+c_1)(2\sigma_{x\hat{x}}+c_2)}
+{(\mu_x^2+\mu_{\hat{x}}^2+c_1)(\sigma_x^2+\sigma_{\hat{x}}^2+c_2)},
+\end{equation}
+where higher PSNR (dB) and SSIM (closer to 1) indicate better reconstruction.
+We additionally report average per-image inference time.
 
 \subsection{DnCNN with residual learning}
 DnCNN predicts the noise residual $\mathcal{R}(y)\approx n$ and recovers
@@ -240,18 +297,30 @@ DnCNN      & 22.52 & 0.583 \\
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{visual_gray.png}
-\caption{Visual comparison on a Set12 image at $\sigma=25$ (PSNR/SSIM annotated).}
-\label{fig:vg}\end{figure}
+\begin{figure*}[t]\centering
+\includegraphics[width=0.92\textwidth]{visual_gray.png}
+\caption{Visual comparison on a Set12 image (\emph{peppers}) at $\sigma=25$, with
+PSNR/SSIM annotated. Gaussian over-smooths; the median filter is poorly suited to
+Gaussian noise; bilateral and NLM preserve more structure; BM3D and DnCNN recover
+the cleanest results.}
+\label{fig:vg}\end{figure*}
 
-% Optional extra figures (upload from results/ and uncomment):
-% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{visual_color.png}
-% \caption{Color denoising on Kodak at $\sigma=25$.}\label{fig:vc}\end{figure}
-% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{saltpepper.png}
-% \caption{Salt-and-pepper denoising; median preserves structure best.}\label{fig:sp}\end{figure}
-% \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{loss_curve.png}
-% \caption{DnCNN training loss over 50 epochs.}\label{fig:loss}\end{figure}
+\begin{figure*}[t]\centering
+\includegraphics[width=0.92\textwidth]{visual_color.png}
+\caption{Color denoising on a Kodak image at $\sigma=25$. The ranking matches the
+grayscale case; DnCNN achieves BM3D-level quality at a fraction of the runtime.}
+\label{fig:vc}\end{figure*}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{saltpepper.png}
+\caption{Salt-and-pepper denoising (5\%). The rank-order median filter preserves
+structure best, while the Gaussian-trained DnCNN fails to remove impulse noise.}
+\label{fig:sp}\end{figure}
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.85\columnwidth]{loss_curve.png}
+\caption{DnCNN training loss (MSE) over 50 epochs.}
+\label{fig:loss}\end{figure}
 
 \subsection{Discussion}
 \textbf{Accuracy ranking.} Across all three noise levels and on color images, the
@@ -287,7 +356,7 @@ DnCNN per channel is a simple but effective color baseline; a natively
 color-trained model, or denoising only the luminance channel in YCbCr, could
 further improve color fidelity.
 
-\section{Conclusion}
+\section{Conclusion}\label{sec:conc}
 We presented a unified, reproducible comparison of five classical denoisers and a
 deep DnCNN under identical noise and evaluation protocols, on grayscale and color
 images and across Gaussian and salt-and-pepper noise. BM3D remains the strongest
