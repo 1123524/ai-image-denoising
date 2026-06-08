@@ -321,6 +321,21 @@ structure best, while the Gaussian-trained DnCNN fails to remove impulse noise.}
 \caption{DnCNN training loss (MSE) over 50 epochs.}
 \label{fig:loss}\end{figure}
 
+\subsection{Demonstration on a user-supplied photo}
+To verify that the methods generalize beyond the benchmark datasets, we apply the
+pipeline to a real photograph captured outside the test sets. The clean image is
+corrupted with synthetic Gaussian noise ($\sigma=25$) and then restored.
+Figure~\ref{fig:demo} shows the original, the noisy input, and the BM3D and DnCNN
+reconstructions, confirming that both methods remove visible noise while
+preserving fur texture and fine detail; consistent with the benchmark, BM3D and
+DnCNN give the strongest results.
+
+\begin{figure*}[tp]\centering
+\includegraphics[width=0.92\textwidth]{demo_shiba.png}
+\caption{Denoising on a user-supplied photograph (left to right: original, noisy
+input at $\sigma=25$, BM3D, DnCNN), with PSNR annotated.}
+\label{fig:demo}\end{figure*}
+
 \subsection{Discussion}
 \textbf{Accuracy ranking.} Across all three noise levels and on color images, the
 ordering is consistent: BM3D $>$ DnCNN $>$ NLM $>$ simple local filters
