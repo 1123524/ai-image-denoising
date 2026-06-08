@@ -17,6 +17,8 @@
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage{url}
+\usepackage{float}      % enables [H] to force figure placement
+\usepackage{stfloats}   % allows full-width figure* to be placed at column bottom
 
 \begin{document}
 
@@ -297,7 +299,7 @@ DnCNN      & 22.52 & 0.583 \\
 \end{tabular}
 \end{table}
 
-\begin{figure*}[t]\centering
+\begin{figure*}[tp]\centering
 \includegraphics[width=0.92\textwidth]{visual_gray.png}
 \caption{Visual comparison on a Set12 image (\emph{peppers}) at $\sigma=25$, with
 PSNR/SSIM annotated. Gaussian over-smooths; the median filter is poorly suited to
@@ -305,19 +307,19 @@ Gaussian noise; bilateral and NLM preserve more structure; BM3D and DnCNN recove
 the cleanest results.}
 \label{fig:vg}\end{figure*}
 
-\begin{figure*}[t]\centering
+\begin{figure*}[tp]\centering
 \includegraphics[width=0.92\textwidth]{visual_color.png}
 \caption{Color denoising on a Kodak image at $\sigma=25$. The ranking matches the
 grayscale case; DnCNN achieves BM3D-level quality at a fraction of the runtime.}
 \label{fig:vc}\end{figure*}
 
-\begin{figure}[t]\centering
+\begin{figure}[H]\centering
 \includegraphics[width=\columnwidth]{saltpepper.png}
 \caption{Salt-and-pepper denoising (5\%). The rank-order median filter preserves
 structure best, while the Gaussian-trained DnCNN fails to remove impulse noise.}
 \label{fig:sp}\end{figure}
 
-\begin{figure}[t]\centering
+\begin{figure}[H]\centering
 \includegraphics[width=0.85\columnwidth]{loss_curve.png}
 \caption{DnCNN training loss (MSE) over 50 epochs.}
 \label{fig:loss}\end{figure}
